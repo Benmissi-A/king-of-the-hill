@@ -13,35 +13,40 @@ contract KingOfTheHill{
     uint256 private _nbTurn;
     uint256 private _blockLimit;
     uint256 private _startingBlock;
+    bool private _gameStart;
     
-    constructor(address owner_ , uint256 blockLimit_ ) payable {
+    constructor(address owner_ , uint256 blockLimit_) payable {
+        require(msg.value>0 , "put a seed befor initialisation");
         _owner = owner_;
         _seed = msg.value;
-        _blockLimit= blockLimit_;
+        _blockLimit = blockLimit_;
    
         
     }
     
     event Enthroned(address sender);
-    event Payed(address recipient, uint256 amount);
+    event Payed(address indexed recipient, uint256 amount);
+    event Refunded(address indexed recipient, uint256 rest);
     
     // surencherir sur la mise
     function offer() external payable {
-        if(_nbTurn == 0){
-            setStartingBlock();
-        }
-        resolveTurn();
         require(msg.value >= 2 * _seed , "KingOfTheHill: you need to put twice the value of the seed");
+        
+        if(_gameStart = false){
+            setStartingBlock();
+            _gameStart = true;
+        }
         
         if(msg.value> 2*_seed){
             uint256 rest = 2*_seed;
             payable(msg.sender).sendValue(msg.value - rest);
+            emit Refunded(msg.sender, msg.value - rest);
         }
+        resolveTurn();
         
-        _seed = address(this).balance;
         _potOwner = msg.sender;
-        
         emit Enthroned(msg.sender);
+        _seed = address(this).balance;
     }
     
     // recuperer ses gains
@@ -50,8 +55,7 @@ contract KingOfTheHill{
          uint256 part = address(this).balance;
          payable(_potOwner).sendValue((part * 80)/100);
          payable(_owner).sendValue((part * 10)/100);
-         
-         emit Payed(_potOwner, address(this).balance);
+         emit Payed(_potOwner, (part * 80)/100);
     }
     
     function withdrawAll() public {
@@ -69,14 +73,14 @@ contract KingOfTheHill{
     }
     
     function resolveTurn() public {
-        if(block.number - _startingBlock == _blockLimit){
-            withdrawSeed();
+        if(block.number - _startingBlock >= _blockLimit){
+            if(_potOwner !=  0x0000000000000000000000000000000000000000 ){
+                withdrawSeed();
+            }
             _nbTurn++;
             setStartingBlock();
         }
     }
-    
-    
     
     // test & debug functions
     
@@ -92,12 +96,19 @@ contract KingOfTheHill{
         return address(this).balance;
     }
     
+    function  viewBlockLimit()public view returns(uint256){
+        return _blockLimit;
+    }
+    
     function viewStartingBlock()public view returns (uint256) {
         return _startingBlock;
     }
+        function viewCurrentBlock()public view returns (uint256) {
+        return block.number;
+    }
     
-      function view()public view returns (uint256) {
-        return _startingBlock;
+      function viewTurn()public view returns (uint256) {
+        return _nbTurn;
     }
     
 }
